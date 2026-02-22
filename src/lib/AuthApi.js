@@ -37,7 +37,7 @@ export const getSession = async () => {
  */
 export const getUserRole = (user) => {
     const metaRole = user?.user_metadata?.role;
-    return metaRole === 'admin-dashboard' ? 'Admin' : 'Viewer';
+    return metaRole === 'admin' ? 'Admin' : 'Viewer';
 };
 
 /**

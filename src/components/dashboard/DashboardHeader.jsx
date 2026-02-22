@@ -1,3 +1,4 @@
+// src/components/dashboard/DashboardHeader.jsx
 import React from 'react';
 import {
     Shield,
@@ -34,14 +35,10 @@ export const DashboardHeader = ({
     onCloseNotifications,
     isProcessing,
     fileInputRef,
-    onBulkUploadClick,
+    onBulkUploadChange,
     onAddMember,
 }) => {
     const dm = darkMode;
-
-    const handleLogout = async () => {
-        await signOut();
-    };
 
     return (
         <div className="max-w-full mx-auto mb-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -66,14 +63,10 @@ export const DashboardHeader = ({
 
             {/* Controls */}
             <div className="flex flex-wrap items-center gap-2.5">
-                {/* Dark Mode Toggle */}
+                {/* Dark Mode */}
                 <button
                     onClick={onToggleDark}
-                    className={`p-2.5 rounded-xl border flex items-center gap-2 text-xs font-bold transition-all ${
-                        dm
-                            ? 'bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-800'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
+                    className={`p-2.5 rounded-xl border flex items-center gap-2 text-xs font-bold transition-all ${dm ? 'bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                 >
                     {dm ? <Sun size={16} /> : <Moon size={16} />}
                     <span className="hidden sm:inline">
@@ -81,13 +74,9 @@ export const DashboardHeader = ({
                     </span>
                 </button>
 
-                {/* Role indicator */}
+                {/* Role badge */}
                 <div
-                    className={`px-3 py-2 rounded-xl border text-xs font-bold ${
-                        dm
-                            ? 'bg-slate-900 border-slate-800 text-slate-400'
-                            : 'bg-white border-slate-200 text-slate-500'
-                    }`}
+                    className={`px-3 py-2 rounded-xl border text-xs font-bold ${dm ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}
                 >
                     {role === 'Admin' ? (
                         <span className="text-blue-400">⬡ Admin</span>
@@ -96,18 +85,14 @@ export const DashboardHeader = ({
                     )}
                 </div>
 
-                {/* Notifications Bell */}
+                {/* Notifikasi */}
                 <div className="relative">
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
                             onToggleNotifications();
                         }}
-                        className={`p-2.5 rounded-xl relative border transition-all ${
-                            dm
-                                ? 'bg-slate-900 border-slate-800 hover:bg-slate-800'
-                                : 'bg-white border-slate-200 hover:bg-slate-50'
-                        }`}
+                        className={`p-2.5 rounded-xl relative border transition-all ${dm ? 'bg-slate-900 border-slate-800 hover:bg-slate-800' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
                     >
                         <Bell
                             size={18}
@@ -119,7 +104,6 @@ export const DashboardHeader = ({
                             </span>
                         )}
                     </button>
-
                     {showNotifications && (
                         <NotificationPanel
                             notifications={notifications}
@@ -129,20 +113,20 @@ export const DashboardHeader = ({
                     )}
                 </div>
 
-                {/* Export group */}
+                {/* Export: CSV | Excel | Print */}
                 <div
                     className={`flex border rounded-xl overflow-hidden ${dm ? 'border-slate-800' : 'border-slate-200'}`}
                 >
                     <button
-                        onClick={() => exportToCSV(members)}
+                        onClick={exportToCSV}
                         title="Export CSV"
                         className={`p-2.5 border-r transition-all ${dm ? 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                     >
                         <Download size={16} />
                     </button>
                     <button
-                        onClick={() => exportToExcel(members)}
-                        title="Export Excel"
+                        onClick={exportToExcel}
+                        title="Export Excel (.xlsx)"
                         className={`p-2.5 border-r transition-all ${dm ? 'bg-slate-900 border-slate-800 text-emerald-500 hover:bg-slate-800' : 'bg-white border-slate-200 text-emerald-600 hover:bg-slate-50'}`}
                     >
                         <FileSpreadsheet size={16} />
@@ -150,15 +134,24 @@ export const DashboardHeader = ({
                   
                 </div>
 
-                {/* Admin actions */}
+                {/* Admin: Template + Bulk + Tambah */}
                 {role === 'Admin' && (
                     <>
+                        {/* Hidden file input untuk bulk upload */}
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={onBulkUploadChange}
+                            accept=".xlsx,.xls,.csv"
+                            className="hidden"
+                        />
+
                         <div
                             className={`flex border rounded-xl overflow-hidden ${dm ? 'border-slate-800' : 'border-slate-200'}`}
                         >
                             <button
                                 onClick={downloadTemplate}
-                                title="Download Template"
+                                title="Download Template Excel"
                                 className={`p-2.5 border-r flex items-center gap-1.5 text-xs font-bold transition-all ${dm ? 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                             >
                                 <TemplateIcon size={16} />
@@ -167,15 +160,15 @@ export const DashboardHeader = ({
                                 </span>
                             </button>
                             <button
-                                onClick={onBulkUploadClick}
+                                onClick={() => fileInputRef.current?.click()}
                                 disabled={isProcessing}
-                                title="Bulk Upload"
+                                title="Bulk Import Excel/CSV"
                                 className={`p-2.5 flex items-center gap-1.5 text-xs font-bold transition-all ${dm ? 'bg-slate-900 text-slate-400 hover:bg-slate-800' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
                             >
                                 {isProcessing ? (
                                     <Loader2
                                         size={16}
-                                        className="animate-spin"
+                                        className="animate-spin text-blue-400"
                                     />
                                 ) : (
                                     <FileUp size={16} />
@@ -195,12 +188,8 @@ export const DashboardHeader = ({
 
                 {/* Logout */}
                 <button
-                    onClick={handleLogout}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${
-                        dm
-                            ? 'bg-slate-900 border-slate-800 text-red-400 hover:bg-red-950/30'
-                            : 'bg-white border-slate-200 text-red-500 hover:bg-red-50'
-                    }`}
+                    onClick={() => signOut()}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all ${dm ? 'bg-slate-900 border-slate-800 text-red-400 hover:bg-red-950/30' : 'bg-white border-slate-200 text-red-500 hover:bg-red-50'}`}
                 >
                     <LogOut size={15} />
                     <span className="hidden sm:inline">Keluar</span>
@@ -210,12 +199,11 @@ export const DashboardHeader = ({
     );
 };
 
+// ─── Notification Panel ───────────────────────────────────────────────────────
 const NotificationPanel = ({ notifications, darkMode: dm, onClose }) => (
     <div
         onClick={(e) => e.stopPropagation()}
-        className={`absolute right-0 mt-3 w-80 border rounded-2xl shadow-2xl z-50 overflow-hidden ${
-            dm ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
-        }`}
+        className={`absolute right-0 mt-3 w-80 border rounded-2xl shadow-2xl z-50 overflow-hidden ${dm ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}
     >
         <div
             className={`px-5 py-3.5 border-b flex items-center justify-between ${dm ? 'bg-slate-800/60 border-slate-800' : 'bg-slate-50 border-slate-100'}`}
@@ -228,12 +216,11 @@ const NotificationPanel = ({ notifications, darkMode: dm, onClose }) => (
             </span>
             <button
                 onClick={onClose}
-                className="text-slate-600 hover:text-slate-400 transition-colors"
+                className="text-slate-600 hover:text-slate-400"
             >
                 <X size={14} />
             </button>
         </div>
-
         <div className="max-h-72 overflow-y-auto">
             {notifications.length === 0 ? (
                 <div className="p-8 text-center text-xs text-slate-600 italic">
@@ -243,11 +230,7 @@ const NotificationPanel = ({ notifications, darkMode: dm, onClose }) => (
                 notifications.map((n) => (
                     <div
                         key={n.id}
-                        className={`px-5 py-4 border-b transition-colors ${
-                            dm
-                                ? 'border-slate-800 hover:bg-slate-800/50'
-                                : 'border-slate-50 hover:bg-slate-50'
-                        } ${n.tipe === 'urgent' ? (dm ? 'bg-red-950/20' : 'bg-red-50/60') : ''}`}
+                        className={`px-5 py-4 border-b transition-colors ${dm ? 'border-slate-800 hover:bg-slate-800/50' : 'border-slate-50 hover:bg-slate-50'} ${n.tipe === 'urgent' ? (dm ? 'bg-red-950/20' : 'bg-red-50/60') : ''}`}
                     >
                         <div className="flex items-start gap-2">
                             <div

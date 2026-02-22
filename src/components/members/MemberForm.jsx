@@ -1,24 +1,13 @@
+// src/components/members/MemberForm.jsx
 import React, { useState } from 'react';
 import { X, Eye, Edit2, Save, Loader2 } from 'lucide-react';
 import { FormField, inputClass } from '../ui/index.jsx';
 import {
-    UNITS,
-    STATUS_KEPEGAWAIAN,
     SHIFT_OPTIONS,
     MODE_KERJA_OPTIONS,
+    BEBAN_KERJA_COLORS,
 } from '../../config/supabase.jsx';
 
-/**
- * @param {Object}   props
- * @param {'view'|'edit'|'add'} props.mode
- * @param {Object}   props.initialData
- * @param {boolean}  props.darkMode
- * @param {string}   props.role - 'Admin' | 'Viewer'
- * @param {boolean}  props.loading
- * @param {Function} props.onSubmit  - async (formData) => void
- * @param {Function} props.onClose
- * @param {Function} props.onSwitchToEdit - () => void
- */
 export const MemberForm = ({
     mode,
     initialData,
@@ -28,8 +17,10 @@ export const MemberForm = ({
     onSubmit,
     onClose,
     onSwitchToEdit,
+    units = [], 
+    statusPegawai = [], 
 }) => {
-    const [formData, setFormData] = useState({
+    const [form, setForm] = useState({
         ...initialData,
         spesialisasi: Array.isArray(initialData.spesialisasi)
             ? initialData.spesialisasi.join(', ')
@@ -39,33 +30,53 @@ export const MemberForm = ({
     const dm = darkMode;
     const isView = mode === 'view';
     const isAdd = mode === 'add';
+    const ic = (dis = false) => inputClass(dm, dis);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        setForm((prev) => ({ ...prev, [name]: value }));
     };
+
+    const selectedStatusNama =
+        statusPegawai.find((s) => s.id === parseInt(form.status_pegawai_id))
+            ?.nama || '';
+    const isOrganik = selectedStatusNama.toLowerCase() === 'organik';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        const unitNama =
+            units.find((u) => u.id === parseInt(form.unit_id))?.nama || '';
+        const statusNama =
+            statusPegawai.find((s) => s.id === parseInt(form.status_pegawai_id))
+                ?.nama || '';
+
         const payload = {
-            ...formData,
-            utilisasi: parseInt(formData.utilisasi) || 0,
+            nik: form.nik,
+            nama: form.nama,
+            unit_id: parseInt(form.unit_id),
+            project: form.project,
+            lokasi: form.lokasi,
+            kontak: form.kontak,
+            utilisasi: parseInt(form.utilisasi) || 0,
+            status_pegawai_id: parseInt(form.status_pegawai_id),
+            shift: form.shift || 'Pagi',
+            mode_kerja: form.mode_kerja || 'Onsite',
+            kontrak_berakhir: isOrganik ? null : form.kontrak_berakhir || null,
             spesialisasi:
-                typeof formData.spesialisasi === 'string'
-                    ? formData.spesialisasi
+                typeof form.spesialisasi === 'string'
+                    ? form.spesialisasi
                           .split(',')
                           .map((s) => s.trim())
                           .filter(Boolean)
-                    : formData.spesialisasi || [],
-            kontrak_berakhir:
-                formData.status_kepegawaian === 'Organik'
-                    ? null
-                    : formData.kontrak_berakhir || null,
+                    : form.spesialisasi || [],
+            // untuk normalizeRow di response
+            unit_nama: unitNama,
+            status_nama: statusNama,
         };
+
         await onSubmit(payload);
     };
-
-    const ic = (disabled = false) => inputClass(dm, disabled);
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
@@ -88,8 +99,8 @@ export const MemberForm = ({
                             {isView
                                 ? 'Detail Profile'
                                 : isAdd
-                                  ? 'New Entry — Personil Baru'
-                                  : 'Update Record'}
+                                  ? 'Tambah Personil Baru'
+                                  : 'Update Data Personil'}
                         </span>
                     </div>
                     <button
@@ -106,16 +117,16 @@ export const MemberForm = ({
                     className="p-7 max-h-[78vh] overflow-y-auto"
                 >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {/* NIK — selalu disabled */}
+                        {/* NIK - free form, tidak disabled */}
                         <FormField label="NIK">
                             <input
                                 name="nik"
                                 required
-                                value={formData.nik || ''}
+                                value={form.nik || ''}
                                 onChange={handleChange}
                                 disabled={isView}
-                                placeholder="NIK"
-                                className={ic(isView)}
+                                placeholder="Contoh: IT2024001"
+                                className={`${ic(isView)} font-mono`}
                             />
                         </FormField>
 
@@ -124,7 +135,7 @@ export const MemberForm = ({
                             <input
                                 name="nama"
                                 required
-                                value={formData.nama || ''}
+                                value={form.nama || ''}
                                 onChange={handleChange}
                                 disabled={isView}
                                 placeholder="Nama Lengkap"
@@ -132,21 +143,30 @@ export const MemberForm = ({
                             />
                         </FormField>
 
-                        {/* Unit */}
+                        {/* Unit — dropdown dari DB */}
                         <FormField label="Unit">
-                            <select
-                                name="unit"
-                                value={formData.unit || UNITS[0]}
-                                onChange={handleChange}
-                                disabled={isView}
-                                className={ic(isView)}
-                            >
-                                {UNITS.map((u) => (
-                                    <option key={u} value={u}>
-                                        {u}
-                                    </option>
-                                ))}
-                            </select>
+                            {isView ? (
+                                <div
+                                    className={`${ic(true)} flex items-center`}
+                                >
+                                    {form.unit_nama || '-'}
+                                </div>
+                            ) : (
+                                <select
+                                    name="unit_id"
+                                    required
+                                    value={form.unit_id || ''}
+                                    onChange={handleChange}
+                                    className={ic()}
+                                >
+                                    <option value="">-- Pilih Unit --</option>
+                                    {units.map((u) => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.nama}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
                         </FormField>
 
                         {/* Project */}
@@ -154,7 +174,7 @@ export const MemberForm = ({
                             <input
                                 name="project"
                                 required
-                                value={formData.project || ''}
+                                value={form.project || ''}
                                 onChange={handleChange}
                                 disabled={isView}
                                 placeholder="Nama Project"
@@ -167,7 +187,7 @@ export const MemberForm = ({
                             <input
                                 name="lokasi"
                                 required
-                                value={formData.lokasi || ''}
+                                value={form.lokasi || ''}
                                 onChange={handleChange}
                                 disabled={isView}
                                 placeholder="Kota"
@@ -180,7 +200,7 @@ export const MemberForm = ({
                             <input
                                 name="kontak"
                                 required
-                                value={formData.kontak || ''}
+                                value={form.kontak || ''}
                                 onChange={handleChange}
                                 disabled={isView}
                                 placeholder="08xxxxxxxxxx"
@@ -188,21 +208,30 @@ export const MemberForm = ({
                             />
                         </FormField>
 
-                        {/* Status Kepegawaian */}
+                        {/* Status Kepegawaian — dropdown dari DB */}
                         <FormField label="Status Kepegawaian">
-                            <select
-                                name="status_kepegawaian"
-                                value={formData.status_kepegawaian || 'Organik'}
-                                onChange={handleChange}
-                                disabled={isView}
-                                className={ic(isView)}
-                            >
-                                {STATUS_KEPEGAWAIAN.map((s) => (
-                                    <option key={s} value={s}>
-                                        {s}
-                                    </option>
-                                ))}
-                            </select>
+                            {isView ? (
+                                <div
+                                    className={`${ic(true)} flex items-center`}
+                                >
+                                    {form.status_nama || '-'}
+                                </div>
+                            ) : (
+                                <select
+                                    name="status_pegawai_id"
+                                    required
+                                    value={form.status_pegawai_id || ''}
+                                    onChange={handleChange}
+                                    className={ic()}
+                                >
+                                    <option value="">-- Pilih Status --</option>
+                                    {statusPegawai.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.nama}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
                         </FormField>
 
                         {/* Utilisasi */}
@@ -213,25 +242,23 @@ export const MemberForm = ({
                                 min="0"
                                 max="100"
                                 required
-                                value={formData.utilisasi ?? 50}
+                                value={form.utilisasi ?? 50}
                                 onChange={handleChange}
                                 disabled={isView}
                                 className={`${ic(isView)} font-bold`}
                             />
-                            {/* Preview beban */}
                             {!isView && (
-                                <div className="mt-1.5 w-full h-1 rounded-full bg-slate-800 overflow-hidden">
+                                <div className="mt-1.5 w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
                                     <div
                                         className={`h-full rounded-full transition-all duration-500 ${
-                                            parseInt(formData.utilisasi) > 90
+                                            parseInt(form.utilisasi) > 90
                                                 ? 'bg-red-500'
-                                                : parseInt(formData.utilisasi) >
-                                                    75
+                                                : parseInt(form.utilisasi) > 75
                                                   ? 'bg-orange-500'
                                                   : 'bg-blue-500'
                                         }`}
                                         style={{
-                                            width: `${Math.min(parseInt(formData.utilisasi) || 0, 100)}%`,
+                                            width: `${Math.min(parseInt(form.utilisasi) || 0, 100)}%`,
                                         }}
                                     />
                                 </div>
@@ -242,7 +269,7 @@ export const MemberForm = ({
                         <FormField label="Shift Kerja">
                             <select
                                 name="shift"
-                                value={formData.shift || 'Pagi'}
+                                value={form.shift || 'Pagi'}
                                 onChange={handleChange}
                                 disabled={isView}
                                 className={ic(isView)}
@@ -259,7 +286,7 @@ export const MemberForm = ({
                         <FormField label="Mode Kerja">
                             <select
                                 name="mode_kerja"
-                                value={formData.mode_kerja || 'Onsite'}
+                                value={form.mode_kerja || 'Onsite'}
                                 onChange={handleChange}
                                 disabled={isView}
                                 className={ic(isView)}
@@ -272,38 +299,30 @@ export const MemberForm = ({
                             </select>
                         </FormField>
 
-                        {/* Akhir Kontrak — disabled jika Organik */}
+                        {/* Akhir Kontrak */}
                         <FormField label="Akhir Kontrak">
                             <input
                                 name="kontrak_berakhir"
                                 type="date"
-                                value={formData.kontrak_berakhir || ''}
+                                value={form.kontrak_berakhir || ''}
                                 onChange={handleChange}
-                                disabled={
-                                    isView ||
-                                    formData.status_kepegawaian === 'Organik'
-                                }
-                                className={ic(
-                                    isView ||
-                                        formData.status_kepegawaian ===
-                                            'Organik',
-                                )}
+                                disabled={isView || isOrganik}
+                                className={ic(isView || isOrganik)}
                             />
-                            {formData.status_kepegawaian === 'Organik' &&
-                                !isView && (
-                                    <p className="text-[10px] text-slate-600 mt-1 italic">
-                                        Tidak berlaku untuk pegawai Organik
-                                    </p>
-                                )}
+                            {isOrganik && !isView && (
+                                <p className="text-[10px] text-slate-500 mt-1 italic">
+                                    Tidak berlaku untuk pegawai Organik
+                                </p>
+                            )}
                         </FormField>
 
-                        {/* Spesialisasi — full width */}
+                        {/* Spesialisasi */}
                         <div className="md:col-span-2">
                             <FormField label="Spesialisasi (pisahkan dengan koma)">
                                 <input
                                     name="spesialisasi"
                                     type="text"
-                                    value={formData.spesialisasi || ''}
+                                    value={form.spesialisasi || ''}
                                     onChange={handleChange}
                                     disabled={isView}
                                     placeholder="Cisco, Fortigate, Mikrotik"
@@ -312,68 +331,71 @@ export const MemberForm = ({
                             </FormField>
                         </div>
 
-                        {/* Info badges saat view mode */}
-                        {isView && formData.beban_kerja && (
+                        {/* Info tambahan saat view */}
+                        {isView && (
                             <div className="md:col-span-2">
                                 <div
-                                    className={`flex flex-wrap gap-4 p-4 rounded-2xl border ${dm ? 'bg-slate-800/40 border-slate-800' : 'bg-slate-50 border-slate-100'}`}
+                                    className={`grid grid-cols-3 gap-4 p-4 rounded-2xl border ${dm ? 'bg-slate-800/40 border-slate-800' : 'bg-slate-50 border-slate-100'}`}
                                 >
+                                    <InfoItem label="Beban Kerja" dm={dm}>
+                                        <span
+                                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black border uppercase ${BEBAN_KERJA_COLORS[form.beban_kerja] || ''}`}
+                                        >
+                                            {form.beban_kerja || '-'}
+                                        </span>
+                                    </InfoItem>
                                     <InfoItem
-                                        label="Beban Kerja"
-                                        value={formData.beban_kerja}
+                                        label="Dibuat"
+                                        value={
+                                            form.created_at
+                                                ? new Date(
+                                                      form.created_at,
+                                                  ).toLocaleDateString('id-ID')
+                                                : '-'
+                                        }
                                         dm={dm}
                                     />
-                                    {formData.sisa_hari_kontrak !== undefined &&
-                                        formData.sisa_hari_kontrak !== null && (
-                                            <InfoItem
-                                                label="Sisa Kontrak"
-                                                value={`${formData.sisa_hari_kontrak} hari`}
-                                                dm={dm}
-                                            />
-                                        )}
-                                    {formData.status_kontrak && (
-                                        <InfoItem
-                                            label="Status Kontrak"
-                                            value={formData.status_kontrak}
-                                            dm={dm}
-                                        />
-                                    )}
+                                    <InfoItem
+                                        label="Diupdate"
+                                        value={
+                                            form.updated_at
+                                                ? new Date(
+                                                      form.updated_at,
+                                                  ).toLocaleDateString('id-ID')
+                                                : '-'
+                                        }
+                                        dm={dm}
+                                    />
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Action Buttons */}
+                    {/* Buttons */}
                     <div
                         className={`mt-7 pt-6 border-t flex justify-end gap-3 ${dm ? 'border-slate-800' : 'border-slate-100'}`}
                     >
                         <button
                             type="button"
                             onClick={onClose}
-                            className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${
-                                dm
-                                    ? 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
+                            className={`px-6 py-2.5 text-sm font-bold rounded-xl transition-all ${dm ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                         >
                             {isView ? 'Tutup' : 'Batal'}
                         </button>
-
                         {isView && role === 'Admin' && (
                             <button
                                 type="button"
                                 onClick={onSwitchToEdit}
-                                className="px-6 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98]"
+                                className="px-6 py-2.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.98]"
                             >
                                 <Edit2 size={16} /> Edit
                             </button>
                         )}
-
                         {!isView && (
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:bg-blue-900 rounded-xl flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98]"
+                                className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:bg-blue-900 rounded-xl flex items-center gap-2 shadow-lg shadow-blue-500/20 active:scale-[0.98]"
                             >
                                 {loading ? (
                                     <>
@@ -397,16 +419,17 @@ export const MemberForm = ({
     );
 };
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
-const InfoItem = ({ label, value, dm }) => (
+const InfoItem = ({ label, value, dm, children }) => (
     <div>
-        <div className="text-[9px] font-bold uppercase tracking-wider text-slate-600 mb-0.5">
+        <div className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1">
             {label}
         </div>
-        <div
-            className={`text-xs font-bold ${dm ? 'text-slate-300' : 'text-slate-700'}`}
-        >
-            {value}
-        </div>
+        {children || (
+            <div
+                className={`text-xs font-bold ${dm ? 'text-slate-300' : 'text-slate-700'}`}
+            >
+                {value || '-'}
+            </div>
+        )}
     </div>
 );

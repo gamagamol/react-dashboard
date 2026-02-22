@@ -1,8 +1,8 @@
+// src/hooks/useExport.js
 import { useEffect } from 'react';
+import { fetchMembersForExport } from '../lib/membersApi.js';
 
-/**
- * Load XLSX library dari CDN
- */
+// Load XLSX dari CDN
 export const useXLSX = () => {
   useEffect(() => {
     if (typeof window !== 'undefined' && !window.XLSX) {
@@ -14,62 +14,46 @@ export const useXLSX = () => {
   }, []);
 };
 
-/**
- * Export members ke file CSV
- */
-export const exportToCSV = (members) => {
-  const headers = [
-    'NIK', 'Nama', 'Unit', 'Project', 'Lokasi', 'Kontak',
-    'Utilisasi', 'Status', 'Shift', 'Mode Kerja',
-    'Kontrak Berakhir', 'Spesialisasi', 'Beban Kerja',
-  ];
+// Export ke CSV — pakai nama (bukan id)
+export const exportToCSV = async () => {
+  const rows = await fetchMembersForExport();
+  if (!rows.length) { alert('Tidak ada data untuk di-export.'); return; }
 
-  const rows = members.map((m) => [
-    m.nik, m.nama, m.unit, m.project, m.lokasi, m.kontak,
-    m.utilisasi, m.status_kepegawaian, m.shift, m.mode_kerja,
-    m.kontrak_berakhir || 'Organik',
-    (m.spesialisasi || []).join('; '),
-    m.beban_kerja,
-  ]);
+  const headers = Object.keys(rows[0]);
+  const content = [
+    headers,
+    ...rows.map((r) => headers.map((h) => `"${String(r[h] ?? '').replace(/"/g, '""')}"`)),
+  ].map((r) => r.join(',')).join('\n');
 
-  const content = [headers, ...rows]
-    .map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
-    .join('\n');
-
-  const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' });
-  triggerDownload(blob, `Report_SSO_${today()}.csv`);
+  triggerDownload(
+    new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8;' }),
+    `Report_SSO_${today()}.csv`
+  );
 };
 
-/**
- * Export members ke file Excel (.xlsx)
- */
-export const exportToExcel = (members) => {
-  if (!window.XLSX) {
-    alert('XLSX library belum siap, coba lagi dalam 1–2 detik.');
-    return;
-  }
+// Export ke Excel — pakai nama (bukan id)
+export const exportToExcel = async () => {
+  if (!window.XLSX) { alert('XLSX library belum siap, coba lagi sebentar.'); return; }
+
+  const rows = await fetchMembersForExport();
+  if (!rows.length) { alert('Tidak ada data untuk di-export.'); return; }
+
+  const headers = [
+    'NIK', 'Nama', 'Unit', 'Project', 'Lokasi', 'Kontak',
+    'Utilisasi', 'Status', 'Shift', 'Mode', 'Akhir_Kontrak',
+    'Spesialisasi', 'Beban_Kerja',
+  ];
 
   const wsData = [
-    ['NIK', 'Nama', 'Unit', 'Project', 'Lokasi', 'Kontak',
-     'Utilisasi (%)', 'Status', 'Shift', 'Mode', 'Akhir Kontrak',
-     'Spesialisasi', 'Beban Kerja', 'Sisa Hari Kontrak'],
-    ...members.map((m) => [
-      m.nik, m.nama, m.unit, m.project, m.lokasi, m.kontak,
-      m.utilisasi, m.status_kepegawaian, m.shift, m.mode_kerja,
-      m.kontrak_berakhir || '',
-      (m.spesialisasi || []).join(', '),
-      m.beban_kerja,
-      m.sisa_hari_kontrak ?? 'N/A',
-    ]),
+    headers,
+    ...rows.map((r) => headers.map((h) => r[h] ?? '')),
   ];
 
   const ws = window.XLSX.utils.aoa_to_sheet(wsData);
-
-  // Set column widths
   ws['!cols'] = [
     { wch: 12 }, { wch: 22 }, { wch: 18 }, { wch: 22 }, { wch: 14 },
-    { wch: 14 }, { wch: 10 }, { wch: 20 }, { wch: 8 }, { wch: 10 },
-    { wch: 14 }, { wch: 30 }, { wch: 12 }, { wch: 16 },
+    { wch: 14 }, { wch: 10 }, { wch: 20 }, { wch: 8  }, { wch: 10 },
+    { wch: 14 }, { wch: 30 }, { wch: 12 },
   ];
 
   const wb = window.XLSX.utils.book_new();
@@ -77,51 +61,65 @@ export const exportToExcel = (members) => {
   window.XLSX.writeFile(wb, `Report_SSO_${today()}.xlsx`);
 };
 
-/**
- * Download template Excel untuk bulk upload
- */
+// Download template — kolom pakai nama bukan id
+// Kolom Unit dan Status harus diisi dengan NAMA (bukan angka)
 export const downloadTemplate = () => {
-  if (!window.XLSX) {
-    alert('XLSX library belum siap, coba lagi dalam 1–2 detik.');
-    return;
-  }
+  if (!window.XLSX) { alert('XLSX library belum siap, coba lagi sebentar.'); return; }
 
-  const template = [
+  const templateData = [
     {
-      NIK: 'IT2024001',
-      Nama: 'Ahmad Subarjo',
-      Unit: 'Network Ops',
-      Project: 'MO Peruri',
-      Lokasi: 'Jakarta',
-      Kontak: '08123456789',
-      Utilisasi: 85,
-      Status: 'Organik',
-      Shift: 'Pagi',
-      Mode: 'Onsite',
+      NIK:           'IT2024001',
+      Nama:          'Ahmad Subarjo',
+      Unit:          'Network Ops',       // ← isi nama unit
+      Project:       'MO Peruri',
+      Lokasi:        'Jakarta',
+      Kontak:        '08123456789',
+      Utilisasi:     85,
+      Status:        'Organik',           // ← isi nama status
+      Shift:         'Pagi',
+      Mode:          'Onsite',
       Akhir_Kontrak: '',
-      Spesialisasi: 'Cisco, Fortigate',
+      Spesialisasi:  'Cisco, Fortigate',
     },
     {
-      NIK: 'IT2024002',
-      Nama: 'Siti Nurhaliza',
-      Unit: 'Security Ops',
-      Project: 'MO General',
-      Lokasi: 'Bandung',
-      Kontak: '08198765432',
-      Utilisasi: 95,
-      Status: 'Outsourcing - ISH',
-      Shift: 'Siang',
-      Mode: 'Hybrid',
+      NIK:           'IT2024002',
+      Nama:          'Siti Nurhaliza',
+      Unit:          'Security Ops',
+      Project:       'MO General',
+      Lokasi:        'Bandung',
+      Kontak:        '08198765432',
+      Utilisasi:     95,
+      Status:        'Outsourcing - ISH',
+      Shift:         'Siang',
+      Mode:          'Hybrid',
       Akhir_Kontrak: '2026-06-30',
-      Spesialisasi: 'Firewall, SIEM',
+      Spesialisasi:  'Firewall, SIEM',
     },
   ];
 
-  const ws = window.XLSX.utils.json_to_sheet(template);
+  const ws = window.XLSX.utils.json_to_sheet(templateData);
+
+  // Tambah komentar / hint valid values di baris ke-4
+  const hintRow = {
+    NIK:           '← Unik, wajib diisi',
+    Nama:          '← Nama lengkap',
+    Unit:          'Pilihan: Network Ops | Cloud Infra | Security Ops | Database Management | CATRINE',
+    Project:       '← Nama project',
+    Lokasi:        '← Kota',
+    Kontak:        '← No. HP',
+    Utilisasi:     '← Angka 0-100',
+    Status:        'Pilihan: Organik | Outsourcing - ISH | Outsourcing - Koptel | CRS',
+    Shift:         'Pilihan: Pagi | Siang | Malam',
+    Mode:          'Pilihan: Onsite | Hybrid | Remote',
+    Akhir_Kontrak: '← Format: YYYY-MM-DD (kosongkan jika Organik)',
+    Spesialisasi:  '← Pisahkan dengan koma',
+  };
+  window.XLSX.utils.sheet_add_json(ws, [hintRow], { skipHeader: true, origin: -1 });
+
   ws['!cols'] = [
-    { wch: 12 }, { wch: 20 }, { wch: 18 }, { wch: 20 }, { wch: 12 },
-    { wch: 14 }, { wch: 10 }, { wch: 20 }, { wch: 8 }, { wch: 10 },
-    { wch: 14 }, { wch: 30 },
+    { wch: 12 }, { wch: 20 }, { wch: 40 }, { wch: 20 }, { wch: 12 },
+    { wch: 14 }, { wch: 10 }, { wch: 40 }, { wch: 10 }, { wch: 10 },
+    { wch: 16 }, { wch: 30 },
   ];
 
   const wb = window.XLSX.utils.book_new();
@@ -129,21 +127,17 @@ export const downloadTemplate = () => {
   window.XLSX.writeFile(wb, 'Template_Upload_MO_SSO.xlsx');
 };
 
-/**
- * Parse file Excel/CSV ke array of objects
- */
+// Parse file Excel/CSV → array of objects
 export const parseExcelFile = (file) =>
   new Promise((resolve, reject) => {
-    if (!window.XLSX) {
-      reject(new Error('XLSX library belum siap'));
-      return;
-    }
+    if (!window.XLSX) { reject(new Error('XLSX library belum siap')); return; }
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
         const wb = window.XLSX.read(evt.target.result, { type: 'binary' });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        resolve(window.XLSX.utils.sheet_to_json(ws));
+        // defval: '' supaya cell kosong tidak undefined
+        resolve(window.XLSX.utils.sheet_to_json(ws, { defval: '' }));
       } catch (err) {
         reject(err);
       }
@@ -153,13 +147,10 @@ export const parseExcelFile = (file) =>
   });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const today = () => new Date().toISOString().split('T')[0];
-
+const today        = () => new Date().toISOString().split('T')[0];
 const triggerDownload = (blob, filename) => {
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
+  const a   = Object.assign(document.createElement('a'), { href: url, download: filename });
   a.click();
   URL.revokeObjectURL(url);
 };
